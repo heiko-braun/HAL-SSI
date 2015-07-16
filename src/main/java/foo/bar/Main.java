@@ -20,10 +20,10 @@ public class Main {
     private static final String TAG_B = "2.6.7.Final";
 
     static String[] tags = {
-            /*"1.1.0.FINAL",
+            "1.1.0.FINAL",
             "1.4.0.Final",
             "1.5.0.Final",
-            "1.6.0.Final",*/
+            "1.6.0.Final",
             "2.0.0.Final",
             "2.1.0.Final",
             "2.2.0.Final",
@@ -49,6 +49,7 @@ public class Main {
 
         // ----
 
+
         try {
             for(int i=0; i<tags.length;i++){
                 if(i+1<tags.length)
@@ -59,6 +60,8 @@ public class Main {
                     calculateCSI(repository, a, b);
                 }
             }
+
+            calculateCSI(repository, "refs/tags/2.6.7.Final", "HEAD");
         } catch (Exception e) {
             e.printStackTrace();
         }
