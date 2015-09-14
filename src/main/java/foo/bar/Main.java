@@ -20,17 +20,17 @@ public class Main {
     private static final String TAG_B = "2.6.7.Final";
 
     static String[] tags = {
-            "1.1.0.FINAL",
-            "1.4.0.Final",
-            "1.5.0.Final",
-            "1.6.0.Final",
-            "2.0.0.Final",
-            "2.1.0.Final",
-            "2.2.0.Final",
-            "2.4.0.Final",
-            "2.5.0.Final",
-            "2.6.0.Final",
-            "2.6.7.Final"
+            "2.8.0",
+            "2.8.1",
+            "2.8.2",
+            "2.8.3",
+            "2.8.3",
+            "2.8.4",
+            "2.8.5",
+            "2.8.6",
+            "2.8.7",
+            "2.8.8.Final",
+            "2.8.9.Final"
     };
 
     public static void main(String[] args) throws Exception {
@@ -51,7 +51,9 @@ public class Main {
 
 
         try {
-            for(int i=0; i<tags.length;i++){
+            int i;
+
+            for(i=0;i<tags.length;i++){
                 if(i+1<tags.length)
                 {
                     String a = "refs/tags/"+tags[i];
@@ -61,7 +63,9 @@ public class Main {
                 }
             }
 
-            calculateCSI(repository, "refs/tags/2.6.7.Final", "HEAD");
+            // the last chunk
+            calculateCSI(repository, "refs/tags/"+tags[i-1], "HEAD");
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -84,7 +88,7 @@ public class Main {
 
     private static void calculateCSI(Repository repository, String a, String b) throws Exception{
 
-        System.out.println(a+">"+b);
+        System.out.println("Processing "+a+">"+b);
 
         CommitFinder finder = new CommitFinder(repository);
 
