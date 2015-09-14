@@ -1,4 +1,4 @@
-package foo.bar;
+package foo.bar.assorted;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.DiffEntry;
