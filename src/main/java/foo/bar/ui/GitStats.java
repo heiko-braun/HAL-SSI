@@ -5,8 +5,10 @@ package foo.bar.ui;
  * @since 14/09/15
  */
 
+import com.github.zafarkhaja.semver.Version;
 import foo.bar.ui.model.Tag;
 import foo.bar.ui.model.VersionDiff;
+import foo.bar.util.Versions;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -16,19 +18,33 @@ import javafx.scene.control.TabPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.LogCommand;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.gitective.core.CommitFinder;
 import org.gitective.core.filter.commit.DiffLineCountFilter;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 
 public class GitStats extends Application {
 
-    private TagList tags;
+    private TagList tagList;
     private SSITable ssiTable;
     private Config config = new Config();
 
@@ -41,7 +57,7 @@ public class GitStats extends Application {
     @Override
     public void start(Stage primaryStage) {
 
-        this.tags = new TagList(this);
+        this.tagList = new TagList(this);
         this.ssiTable = new SSITable(this);
 
         primaryStage.setTitle("Git Project Statistics");
@@ -50,7 +66,7 @@ public class GitStats extends Application {
 
         // -------
 
-        grid.setLeft(tags);
+        grid.setLeft(tagList);
 
         // update tags
 
@@ -70,7 +86,7 @@ public class GitStats extends Application {
 
         Tab issuesTab = new Tab();
         issuesTab.setText("Issues");
-        issuesTab.setContent(new Text("SSI goes here"));
+        issuesTab.setContent(new Text("Issues goes here"));
 
         tabPane.getTabs().add(ssiTab);
         tabPane.getTabs().add(issuesTab);
@@ -83,14 +99,48 @@ public class GitStats extends Application {
     }
 
     private void refreshTags() {
-        ObservableList<Tag> data =
-                FXCollections.observableArrayList(
-                        new Tag("2.8.7", "04-09-2015"),
-                        new Tag("2.8.8.Final", "08-09-2015"),
-                        new Tag("2.8.9.Final", "14-09-2015")
-                );
 
-        tags.setItems(data);
+        List<Tag> tags = new LinkedList<>();
+        try {
+            Repository repository = config.getRepository();
+            List<Ref> call = new Git(repository).tagList().call();
+
+            final RevWalk walk = new RevWalk(repository);
+
+            for (Ref ref : call) {
+
+                String refName = ref.getName();
+                String tagName = refName.substring(refName.lastIndexOf("/") + 1, refName.length());
+
+                Date date = null;
+                try {
+                    RevCommit commit = walk.parseCommit(getActualRefObjectId(ref));
+                    PersonIdent authorIdent = commit.getAuthorIdent();
+                    date = authorIdent.getWhen();
+                } catch (IOException e) {
+                    System.out.println("Failed to parse COMMIT ("+tagName+"): " + e.getMessage());
+                }
+
+                Optional<Version> version = Versions.parseVersion(tagName);
+                if(version.isPresent())
+                tags.add(new Tag(version.get(), tagName, date));
+            }
+        } catch (GitAPIException e) {
+            throw new RuntimeException("Failed to parse TAG's", e);
+        }
+
+        Collections.sort(tags);
+        ObservableList<Tag> data = FXCollections.observableArrayList(tags);
+
+        tagList.setItems(data);
+    }
+
+
+    private ObjectId getActualRefObjectId(Ref ref) {
+        if(ref.isPeeled())
+            return config.getRepository().peel(ref).getObjectId();
+        else
+            return ref.getObjectId();
     }
 
     private static void commitInfo(Repository repository, String a, String b)  throws Exception {
@@ -104,26 +154,34 @@ public class GitStats extends Application {
     }
 
     public void onTagSelection(List<Tag> tags) {
-        Repository repository = config.getRepository();
+
+        tags.forEach(t -> System.out.println(t));
+
+        Repository repository = null;
 
         try {
+            repository = config.getRepository();
+
             int i;
 
             List<VersionDiff> changes = new LinkedList<>();
             for(i=0;i<tags.size();i++){
                 if(i+1<tags.size())
                 {
-                    String a = "refs/tags/"+tags.get(i);
-                    String b = "refs/tags/"+tags.get(i + 1);
+                    String a = "refs/tags/"+tags.get(i).getRevName();
+                    String b = "refs/tags/"+tags.get(i + 1).getRevName();
 
-
-                    changes.add(calculateCSI(repository, a, b));
+                    VersionDiff diff = calculateCSI(repository, a, b);
+                    if(diff.getCsi()>0) // bogus tags
+                        changes.add(diff);
                 }
             }
 
-            // the last chunk
-            changes.add(calculateCSI(repository, "refs/tags/" + tags.get(i - 1), "HEAD"));
-
+            // HEAD
+            /*VersionDiff headCsi = calculateCSI(repository, "refs/tags/" + tags.get(i - 1), "HEAD");
+            if(headCsi.getCsi()>0) // in some cases the last tag and head are the same
+                changes.add(headCsi);
+*/
             ssiTable.updateFrom(FXCollections.observableArrayList(changes));
 
         } catch (Exception e) {
@@ -136,7 +194,7 @@ public class GitStats extends Application {
 
     private VersionDiff calculateCSI(Repository repository, String a, String b) throws Exception{
 
-        System.out.println("Processing "+a+">"+b);
+        //System.out.println("Processing "+a+">"+b);
 
         CommitFinder finder = new CommitFinder(repository);
 
@@ -155,11 +213,11 @@ public class GitStats extends Application {
         System.out.println("CSI:\t" + (filter.getAdded() + filter.getEdited()));*/
 
         return new VersionDiff(
-                b,
+                a+" > "+b,
                 filter.getAdded(),
                 filter.getEdited(),
                 filter.getDeleted(),
-                (filter.getAdded() + filter.getEdited()) // ssi
+                (filter.getAdded() + filter.getEdited()) // csi
         );
 
         //System.out.println(bugCommits.getCount() + " total bugs fixed");

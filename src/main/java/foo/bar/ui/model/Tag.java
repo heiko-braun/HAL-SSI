@@ -1,52 +1,44 @@
 package foo.bar.ui.model;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import com.github.zafarkhaja.semver.Version;
+
 import java.util.Date;
 
 /**
  * @author Heiko Braun
  * @since 14/09/15
  */
-public class Tag {
+public class Tag implements Comparable<Tag> {
 
-    private String name;
+    private Version version;
+    private final String revName;
     private Date date;
 
-    public Tag(String title, Date date) {
-        this.name = title;
+    public Tag(Version version, String revName, Date date) {
+        this.version = version;
+        this.revName = revName;
         this.date = date;
     }
 
-    public Tag(String title, String date) {
-        this.name = title;
-
-        try {
-            SimpleDateFormat fmt = new SimpleDateFormat("dd-MM-yyyy");
-            this.date = fmt.parse( date );
-        } catch (ParseException e) {
-            throw new RuntimeException(e);
-        }
+    public String getRevName() {
+        return revName;
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
+    public Version getVersion() {
+        return version;
     }
 
     public Date getDate() {
         return date;
     }
 
-    public void setDate(Date date) {
-        this.date = date;
+    @Override
+    public String toString() {
+        return getRevName().toString();
     }
 
     @Override
-    public String toString() {
-        return name;
+    public int compareTo(Tag o) {
+        return this.getVersion().compareTo(o.getVersion());
     }
 }

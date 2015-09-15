@@ -1,6 +1,7 @@
 package foo.bar.ui;
 
 import foo.bar.ui.model.VersionDiff;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
@@ -11,6 +12,9 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
+import javafx.util.Callback;
+
+import java.util.Optional;
 
 /**
  * @author Heiko Braun
@@ -19,8 +23,9 @@ import javafx.scene.layout.VBox;
 public class SSITable extends VBox {
 
     private TableView<VersionDiff> table;
+    private Optional<Long> prevSSI;
 
-     public SSITable(GitStats presenter) {
+    public SSITable(GitStats presenter) {
          super();
 
 
@@ -44,11 +49,32 @@ public class SSITable extends VBox {
          TableColumn removed = new TableColumn("Removed");
          removed.setCellValueFactory(new PropertyValueFactory<>("removed"));
 
+         TableColumn csi = new TableColumn("CSI");
+         csi.setCellValueFactory(new PropertyValueFactory<>("csi"));
+
          TableColumn ssi = new TableColumn("SSI");
-         ssi.setCellValueFactory(new PropertyValueFactory<>("ssi"));
 
-         table.getColumns().addAll(diff, added, changed, removed, ssi);
+         table.getColumns().addAll(diff, added, changed, removed, csi, ssi);
 
+         ssi.setCellValueFactory(
+                 new Callback<TableColumn.CellDataFeatures, ObservableValue>() {
+                     @Override
+                     public ObservableValue call(TableColumn.CellDataFeatures param) {
+
+                         VersionDiff diff = (VersionDiff) param.getValue();
+
+                         long ssi;
+                         if(prevSSI.isPresent()) {
+                             ssi = (prevSSI.get() + diff.getCsi()) - diff.getRemoved() - diff.getChanged();
+                         }
+                         else {
+                             ssi = diff.getCsi();
+                         }
+                         prevSSI = Optional.of(ssi);
+                         return new ReadOnlyObjectWrapper<Long>(ssi);
+                     }
+                 }
+         );
 
          table.getSelectionModel().selectedItemProperty().addListener(
                  new ChangeListener<VersionDiff>() {
@@ -62,7 +88,7 @@ public class SSITable extends VBox {
                              TablePosition to = it.next();
 
                              Tag[] tags = retrieve(from.getRow(), to.getRow());
-                             System.out.println(tags[0].getName() + " > " + tags[1].getName());
+                             System.out.println(tags[0].getVersion() + " > " + tags[1].getVersion());
                          }*/
                      }
                  }
@@ -73,6 +99,7 @@ public class SSITable extends VBox {
      }
 
     public void updateFrom(ObservableList<VersionDiff> changes) {
+        prevSSI = Optional.empty();
         table.setItems(changes);
 
     }

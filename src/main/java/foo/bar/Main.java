@@ -20,16 +20,8 @@ public class Main {
     private static final String TAG_B = "2.6.7.Final";
 
     static String[] tags = {
-            "2.8.0",
-            "2.8.1",
-            "2.8.2",
-            "2.8.3",
-            "2.8.4",
-            "2.8.5",
-            "2.8.6",
-            "2.8.7",
-            "2.8.8.Final",
-            "2.8.9.Final"
+            "2.7.1.Final",
+            "2.7.2.Final"
     };
 
     public static void main(String[] args) throws Exception {

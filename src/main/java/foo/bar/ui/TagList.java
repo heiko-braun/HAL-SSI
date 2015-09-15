@@ -16,10 +16,8 @@ import javafx.scene.layout.VBox;
 import javafx.util.Callback;
 
 import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 
 /**
  * @author Heiko Braun
@@ -38,13 +36,16 @@ public class TagList extends VBox {
         setSpacing(5);
         setPadding(new Insets(10, 0, 0, 10));
 
-        final Label label = new Label("TAG's");
+        final Label label = new Label("Releases");
 
         this.table = new TableView();
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
-        TableColumn nameCol = new TableColumn("Name");
-        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        TableColumn nameCol = new TableColumn("Version");
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("version"));
+
+        TableColumn revCol = new TableColumn("Rev");
+        revCol.setCellValueFactory(new PropertyValueFactory<>("revName"));
 
         TableColumn dateCol = new TableColumn("Date");
         dateCol.setCellValueFactory(
@@ -58,7 +59,7 @@ public class TagList extends VBox {
                 }
         );
 
-        table.getColumns().addAll(nameCol, dateCol);
+        table.getColumns().addAll(nameCol, revCol, dateCol);
 
         table.getSelectionModel().selectedItemProperty().addListener(
                 new ChangeListener<Tag>() {
@@ -84,14 +85,23 @@ public class TagList extends VBox {
 
     public LinkedList<Tag> getSlice(int from, int to) {
 
+        int begin = from;
+        int end = to;
+
+        // interaction happens the other way around
+        if(from>to) {
+            begin = to;
+            end = from;
+        }
+
         LinkedList<Tag> tags = new LinkedList<>();
         Iterator<Tag> iterator = table.getItems().iterator();
         int i=0;
         while(iterator.hasNext())
         {
             Tag next = iterator.next();
-            if(i>=from || i==to) {
-                tags.add(next); ;
+            if(i>=begin &&  i<=end) {
+                tags.add(next);
             }
             else if(i>to) {
                 break;

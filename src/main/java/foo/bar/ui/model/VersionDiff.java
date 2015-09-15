@@ -10,14 +10,14 @@ public class VersionDiff {
     long added;
     long changed;
     long removed;
-    long ssi;
+    long csi;
 
-    public VersionDiff(String version, long added, long changed, long removed, long ssi) {
+    public VersionDiff(String version, long added, long changed, long removed, long csi) {
         this.version = version;
         this.added = added;
         this.changed = changed;
         this.removed = removed;
-        this.ssi = ssi;
+        this.csi = csi;
     }
 
     public String getVersion() {
@@ -36,7 +36,7 @@ public class VersionDiff {
         return removed;
     }
 
-    public long getSsi() {
-        return ssi;
+    public long getCsi() {
+        return csi;
     }
 }
