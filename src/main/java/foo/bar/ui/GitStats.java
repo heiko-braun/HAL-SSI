@@ -19,36 +19,30 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.LogCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.gitective.core.CommitFinder;
 import org.gitective.core.filter.commit.DiffLineCountFilter;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class GitStats extends Application {
 
     private TagList tagList;
     private SSITable ssiTable;
     private Config config = new Config();
-
-
+    private List<Tag> currentTags;
 
     public static void main(String[] args) {
         launch(args);
@@ -68,10 +62,12 @@ public class GitStats extends Application {
 
         grid.setLeft(tagList);
 
-        // update tags
+        // load tags
+        this.currentTags = loadTags();
 
-        refreshTags();
-
+        // update view
+        ObservableList<Tag> data = FXCollections.observableArrayList(this.currentTags);
+        tagList.setItems(data);
 
         // -------
 
@@ -98,14 +94,14 @@ public class GitStats extends Application {
         primaryStage.show();
     }
 
-    private void refreshTags() {
+    private List<Tag> loadTags() {
 
         List<Tag> tags = new LinkedList<>();
-        try {
-            Repository repository = config.getRepository();
-            List<Ref> call = new Git(repository).tagList().call();
+        Repository repository = config.getRepository();
+        final RevWalk walk = new RevWalk(repository);
 
-            final RevWalk walk = new RevWalk(repository);
+        try {
+            List<Ref> call = new Git(repository).tagList().call();
 
             for (Ref ref : call) {
 
@@ -128,11 +124,14 @@ public class GitStats extends Application {
         } catch (GitAPIException e) {
             throw new RuntimeException("Failed to parse TAG's", e);
         }
+        finally {
+            walk.dispose();
+            repository.close();
+        }
 
         Collections.sort(tags);
-        ObservableList<Tag> data = FXCollections.observableArrayList(tags);
+        return tags;
 
-        tagList.setItems(data);
     }
 
 
@@ -143,7 +142,7 @@ public class GitStats extends Application {
             return ref.getObjectId();
     }
 
-    private static void commitInfo(Repository repository, String a, String b)  throws Exception {
+    /*private static void commitInfo(Repository repository, String a, String b)  throws Exception {
         RevWalk walk = new RevWalk(repository);
 
         RevCommit commitA = walk.parseCommit(repository.resolve(a));
@@ -151,38 +150,31 @@ public class GitStats extends Application {
 
         System.out.println(commitA.getType());
         walk.dispose();
-    }
+    }*/
 
-    public void onTagSelection(List<Tag> tags) {
-
-        tags.forEach(t -> System.out.println(t));
-
-        Repository repository = null;
+    private List<VersionDiff> getChangesForTags(List<Tag> tags) {
+        Repository repository = config.getRepository();
+        List<VersionDiff> changes = new LinkedList<>();
 
         try {
-            repository = config.getRepository();
 
             int i;
-
-            List<VersionDiff> changes = new LinkedList<>();
             for(i=0;i<tags.size();i++){
                 if(i+1<tags.size())
                 {
-                    String a = "refs/tags/"+tags.get(i).getRevName();
-                    String b = "refs/tags/"+tags.get(i + 1).getRevName();
 
-                    VersionDiff diff = calculateCSI(repository, a, b);
+                    VersionDiff diff = calculateCSI(repository, tags.get(i), tags.get(i + 1));
                     if(diff.getCsi()>0) // bogus tags
                         changes.add(diff);
                 }
             }
 
             // HEAD
-            /*VersionDiff headCsi = calculateCSI(repository, "refs/tags/" + tags.get(i - 1), "HEAD");
-            if(headCsi.getCsi()>0) // in some cases the last tag and head are the same
-                changes.add(headCsi);
-*/
-            ssiTable.updateFrom(FXCollections.observableArrayList(changes));
+                    /*VersionDiff headCsi = calculateCSI(repository, "refs/tags/" + tags.get(i - 1), "HEAD");
+                    if(headCsi.getCsi()>0) // in some cases the last tag and head are the same
+                        changes.add(headCsi);
+                    */
+
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -190,9 +182,43 @@ public class GitStats extends Application {
         finally {
             repository.close();
         }
+
+        return changes;
     }
 
-    private VersionDiff calculateCSI(Repository repository, String a, String b) throws Exception{
+    public void onTagSelection(LinkedList<Tag> tags) {
+
+        // calculate SSI for all changes (baseline)
+        // TODO: should be cached
+
+        List<VersionDiff> changes = getChangesForTags(this.currentTags);
+
+        long ssi = 0;
+        for (VersionDiff change : changes) {
+
+            if (0 == ssi) {
+                ssi = change.getCsi();
+            } else
+            {
+                ssi = (ssi + change.getCsi()) - change.getRemoved() - change.getChanged();
+            }
+
+            change.setSsi(ssi);
+        }
+
+        // filter the range of commits
+        List<VersionDiff> range = changes
+            .stream()
+            .filter(c -> {
+                return c.getTagFrom().getVersion().greaterThanOrEqualTo(tags.getFirst().getVersion())
+                        && c.getTagFrom().getVersion().lessThanOrEqualTo(tags.getLast().getVersion());
+            })
+            .collect(Collectors.toList());
+
+        ssiTable.updateFrom(FXCollections.observableArrayList(range));
+    }
+
+    private VersionDiff calculateCSI(Repository repository, Tag tagFrom, Tag tagTo) throws Exception{
 
         //System.out.println("Processing "+a+">"+b);
 
@@ -201,19 +227,16 @@ public class GitStats extends Application {
         DiffLineCountFilter filter = new DiffLineCountFilter();
         finder.setFilter(filter);
 
+        String a = "refs/tags/"+tagFrom.getRevName();
+        String b = "refs/tags/"+tagTo.getRevName();
+
+        // git traversal
         ObjectId start = repository.resolve(b);
         ObjectId end = repository.resolve(a);
-
         finder.findBetween(start, end);
 
-        /*System.out.println("Added:\t"+filter.getAdded());
-        System.out.println("Changed:\t"+filter.getEdited());
-        System.out.println("Deleted:\t"+filter.getDeleted());
-
-        System.out.println("CSI:\t" + (filter.getAdded() + filter.getEdited()));*/
-
         return new VersionDiff(
-                a+" > "+b,
+                tagFrom, tagTo,
                 filter.getAdded(),
                 filter.getEdited(),
                 filter.getDeleted(),
