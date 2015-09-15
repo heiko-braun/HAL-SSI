@@ -10,6 +10,7 @@ import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 /**
@@ -18,17 +19,20 @@ import javafx.scene.layout.VBox;
  */
 public class SSITable extends VBox {
 
+    private final GitStats presenter;
     private TableView<VersionDiff> table;
 
     public SSITable(GitStats presenter) {
         super();
+        this.presenter = presenter;
+        setFillWidth(true);
 
-        setSpacing(5);
-        setPadding(new Insets(10, 0, 0, 10));
+        setPadding(new Insets(10, 5, 10, 5));
 
         final Label label = new Label("SSI Values");
 
         this.table = new TableView();
+
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
         TableColumn diff = new TableColumn("Version");
@@ -71,6 +75,8 @@ public class SSITable extends VBox {
 
         getChildren().addAll(label, table);
 
+        setVgrow(table, Priority.ALWAYS);
+
     }
 
     public void updateFrom(ObservableList<VersionDiff> changes) {
@@ -78,4 +84,5 @@ public class SSITable extends VBox {
         table.setItems(changes);
 
     }
+
 }

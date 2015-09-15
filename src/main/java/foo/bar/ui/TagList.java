@@ -12,6 +12,9 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TablePosition;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.Callback;
 
@@ -32,13 +35,20 @@ public class TagList extends VBox {
         super();
         this.presenter = presenter;
 
+        setPadding(new Insets(10, 5, 10, 5));
 
-        setSpacing(5);
-        setPadding(new Insets(10, 0, 0, 10));
+        /*ColumnConstraints columnConstraints = new ColumnConstraints();
+        columnConstraints.setFillWidth(true);
+        columnConstraints.setHgrow(Priority.ALWAYS);
+        getColumnConstraints().add(columnConstraints);
+*/
 
         final Label label = new Label("Releases");
 
-        this.table = new TableView();
+        table = new TableView();
+
+        table.setMaxHeight(Double.MAX_VALUE);
+        table.setMaxWidth(Double.MAX_VALUE);
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 
         TableColumn nameCol = new TableColumn("Version");
@@ -52,7 +62,7 @@ public class TagList extends VBox {
                 new Callback<TableColumn.CellDataFeatures, ObservableValue>() {
                     @Override
                     public ObservableValue call(TableColumn.CellDataFeatures param) {
-                        Tag tag = (Tag)param.getValue();
+                        Tag tag = (Tag) param.getValue();
                         SimpleDateFormat fmt = new SimpleDateFormat("dd-MM-yyyy");
                         return new ReadOnlyObjectWrapper<String>(fmt.format(tag.getDate()));
                     }
@@ -67,7 +77,7 @@ public class TagList extends VBox {
                     public void changed(ObservableValue observableValue, Tag oldValue, Tag newValue) {
 
                         ObservableList<TablePosition> selectedCells = table.getSelectionModel().getSelectedCells();
-                        if (2==selectedCells.size()) {
+                        if (2 == selectedCells.size()) {
                             Iterator<TablePosition> it = selectedCells.iterator();
                             TablePosition from = it.next();
                             TablePosition to = it.next();
@@ -81,6 +91,7 @@ public class TagList extends VBox {
 
         getChildren().addAll(label, table);
 
+        setVgrow(table, Priority.ALWAYS);
     }
 
     public LinkedList<Tag> getSlice(int from, int to) {
@@ -116,4 +127,5 @@ public class TagList extends VBox {
     public void setItems(ObservableList<Tag> items){
         table.setItems(items);
     }
+
 }

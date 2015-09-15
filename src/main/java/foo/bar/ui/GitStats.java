@@ -62,13 +62,6 @@ public class GitStats extends Application {
 
         grid.setLeft(tagList);
 
-        // load tags
-        this.currentTags = loadTags();
-
-        // update view
-        ObservableList<Tag> data = FXCollections.observableArrayList(this.currentTags);
-        tagList.setItems(data);
-
         // -------
 
         TabPane tabPane = new TabPane();
@@ -90,8 +83,24 @@ public class GitStats extends Application {
         grid.setCenter(tabPane);
 
         Scene scene = new Scene(grid, 800, 600);
+
         primaryStage.setScene(scene);
         primaryStage.show();
+
+        // resize handler
+        primaryStage.setResizable(true);
+
+
+        // --- init
+
+        // load tags
+        currentTags = loadTags();
+
+        // update view
+        ObservableList<Tag> data = FXCollections.observableArrayList(currentTags);
+        tagList.setItems(data);
+
+
     }
 
     private List<Tag> loadTags() {
