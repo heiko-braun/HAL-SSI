@@ -76,7 +76,6 @@ public class SSITable extends VBox {
         getChildren().addAll(label, table);
 
         setVgrow(table, Priority.ALWAYS);
-
     }
 
     public void updateFrom(ObservableList<VersionDiff> changes) {

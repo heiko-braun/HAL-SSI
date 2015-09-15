@@ -12,6 +12,7 @@ import foo.bar.util.Versions;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.scene.Scene;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -35,6 +36,8 @@ import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 public class GitStats extends Application {
@@ -43,14 +46,21 @@ public class GitStats extends Application {
     private SSITable ssiTable;
     private Config config = new Config();
     private List<Tag> currentTags;
+    private ExecutorService workers;
 
     public static void main(String[] args) {
         launch(args);
     }
 
     @Override
+    public void stop() throws Exception {
+        workers.shutdown();
+    }
+
+    @Override
     public void start(Stage primaryStage) {
 
+        this.workers = Executors.newFixedThreadPool(2);
         this.tagList = new TagList(this);
         this.ssiTable = new SSITable(this);
 
@@ -128,7 +138,7 @@ public class GitStats extends Application {
 
                 Optional<Version> version = Versions.parseVersion(tagName);
                 if(version.isPresent())
-                tags.add(new Tag(version.get(), tagName, date));
+                    tags.add(new Tag(version.get(), tagName, date));
             }
         } catch (GitAPIException e) {
             throw new RuntimeException("Failed to parse TAG's", e);
@@ -150,16 +160,6 @@ public class GitStats extends Application {
         else
             return ref.getObjectId();
     }
-
-    /*private static void commitInfo(Repository repository, String a, String b)  throws Exception {
-        RevWalk walk = new RevWalk(repository);
-
-        RevCommit commitA = walk.parseCommit(repository.resolve(a));
-        RevCommit commitB = walk.parseCommit(repository.resolve(b));
-
-        System.out.println(commitA.getType());
-        walk.dispose();
-    }*/
 
     private List<VersionDiff> getChangesForTags(List<Tag> tags) {
         Repository repository = config.getRepository();
@@ -200,36 +200,45 @@ public class GitStats extends Application {
         // calculate SSI for all changes (baseline)
         // TODO: should be cached
 
-        List<VersionDiff> changes = getChangesForTags(this.currentTags);
 
-        long ssi = 0;
-        for (VersionDiff change : changes) {
+        Task task = new Task<Void>() {
+            @Override public Void call() {
 
-            if (0 == ssi) {
-                ssi = change.getCsi();
-            } else
-            {
-                ssi = (ssi + change.getCsi()) - change.getRemoved() - change.getChanged();
+                List<VersionDiff> changes = getChangesForTags(currentTags);
+
+                long ssi = 0;
+                for (VersionDiff change : changes) {
+
+                    if (0 == ssi) {
+                        ssi = change.getCsi();
+                    } else
+                    {
+                        ssi = (ssi + change.getCsi()) - change.getRemoved() - change.getChanged();
+                    }
+
+                    change.setSsi(ssi);
+                }
+
+                // filter the range of commits
+                List<VersionDiff> range = changes
+                        .stream()
+                        .filter(c -> {
+                            return c.getTagFrom().getVersion().greaterThanOrEqualTo(tags.getFirst().getVersion())
+                                    && c.getTagFrom().getVersion().lessThanOrEqualTo(tags.getLast().getVersion());
+                        })
+                        .collect(Collectors.toList());
+
+                ssiTable.updateFrom(FXCollections.observableArrayList(range));
+
+
+                return null;
             }
+        };
 
-            change.setSsi(ssi);
-        }
-
-        // filter the range of commits
-        List<VersionDiff> range = changes
-            .stream()
-            .filter(c -> {
-                return c.getTagFrom().getVersion().greaterThanOrEqualTo(tags.getFirst().getVersion())
-                        && c.getTagFrom().getVersion().lessThanOrEqualTo(tags.getLast().getVersion());
-            })
-            .collect(Collectors.toList());
-
-        ssiTable.updateFrom(FXCollections.observableArrayList(range));
+        workers.submit(task);
     }
 
     private VersionDiff calculateCSI(Repository repository, Tag tagFrom, Tag tagTo) throws Exception{
-
-        //System.out.println("Processing "+a+">"+b);
 
         CommitFinder finder = new CommitFinder(repository);
 
@@ -252,7 +261,6 @@ public class GitStats extends Application {
                 (filter.getAdded() + filter.getEdited()) // csi
         );
 
-        //System.out.println(bugCommits.getCount() + " total bugs fixed");
     }
 
 }
