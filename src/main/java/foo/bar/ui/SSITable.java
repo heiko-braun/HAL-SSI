@@ -20,6 +20,7 @@ import javafx.scene.layout.VBox;
 public class SSITable extends VBox {
 
     private final GitStats presenter;
+    private final SSIChart chart;
     private TableView<VersionDiff> table;
 
     public SSITable(GitStats presenter) {
@@ -75,6 +76,10 @@ public class SSITable extends VBox {
 
         getChildren().addAll(label, table);
 
+
+        chart = new SSIChart();
+        getChildren().add(chart);
+
         setVgrow(table, Priority.ALWAYS);
     }
 
@@ -82,6 +87,7 @@ public class SSITable extends VBox {
 
         table.setItems(changes);
 
+        chart.updateFrom(changes);
     }
 
 }

@@ -1,6 +1,5 @@
 package foo.bar.ui;
 
-import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.HBox;

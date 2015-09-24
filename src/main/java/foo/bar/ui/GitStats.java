@@ -241,10 +241,11 @@ public class GitStats extends Application {
                             })
                             .collect(Collectors.toList());
 
-                    ssiTable.updateFrom(FXCollections.observableArrayList(range));
+
                     Platform.runLater(new Runnable() {
                         @Override
                         public void run() {
+                            ssiTable.updateFrom(FXCollections.observableArrayList(range));
                             footer.setProgressVisible(false);
                         }
                     });
