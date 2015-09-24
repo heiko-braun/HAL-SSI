@@ -31,7 +31,7 @@ public class SSITable extends VBox {
 
         final Label label = new Label("SSI Values");
 
-        this.table = new TableView();
+        table = new TableView();
 
         table.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 

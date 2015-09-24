@@ -10,6 +10,7 @@ import foo.bar.ui.model.Tag;
 import foo.bar.ui.model.VersionDiff;
 import foo.bar.util.Versions;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -47,6 +48,7 @@ public class GitStats extends Application {
     private Config config = new Config();
     private List<Tag> currentTags;
     private ExecutorService workers;
+    private Footer footer;
 
     public static void main(String[] args) {
         launch(args);
@@ -91,6 +93,9 @@ public class GitStats extends Application {
         tabPane.getTabs().add(issuesTab);
 
         grid.setCenter(tabPane);
+
+        footer = new Footer();
+        grid.setBottom(footer);
 
         Scene scene = new Scene(grid, 800, 600);
 
@@ -200,36 +205,53 @@ public class GitStats extends Application {
         // calculate SSI for all changes (baseline)
         // TODO: should be cached
 
-
         Task task = new Task<Void>() {
             @Override public Void call() {
 
-                List<VersionDiff> changes = getChangesForTags(currentTags);
+                try {
 
-                long ssi = 0;
-                for (VersionDiff change : changes) {
+                    Platform.runLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            footer.setProgressVisible(true);
+                        }
+                    });
 
-                    if (0 == ssi) {
-                        ssi = change.getCsi();
-                    } else
-                    {
-                        ssi = (ssi + change.getCsi()) - change.getRemoved() - change.getChanged();
+                    List<VersionDiff> changes = getChangesForTags(currentTags);
+
+                    long ssi = 0;
+                    for (VersionDiff change : changes) {
+
+                        if (0 == ssi) {
+                            ssi = change.getCsi();
+                        } else
+                        {
+                            ssi = (ssi + change.getCsi()) - change.getRemoved() - change.getChanged();
+                        }
+
+                        change.setSsi(ssi);
                     }
 
-                    change.setSsi(ssi);
+                    // filter the range of commits
+                    List<VersionDiff> range = changes
+                            .stream()
+                            .filter(c -> {
+                                return c.getTagFrom().getVersion().greaterThanOrEqualTo(tags.getFirst().getVersion())
+                                        && c.getTagFrom().getVersion().lessThanOrEqualTo(tags.getLast().getVersion());
+                            })
+                            .collect(Collectors.toList());
+
+                    ssiTable.updateFrom(FXCollections.observableArrayList(range));
+                    Platform.runLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            footer.setProgressVisible(false);
+                        }
+                    });
+
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-
-                // filter the range of commits
-                List<VersionDiff> range = changes
-                        .stream()
-                        .filter(c -> {
-                            return c.getTagFrom().getVersion().greaterThanOrEqualTo(tags.getFirst().getVersion())
-                                    && c.getTagFrom().getVersion().lessThanOrEqualTo(tags.getLast().getVersion());
-                        })
-                        .collect(Collectors.toList());
-
-                ssiTable.updateFrom(FXCollections.observableArrayList(range));
-
 
                 return null;
             }
